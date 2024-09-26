@@ -1,0 +1,62 @@
+name: Build and Release
+
+on:
+  push:
+    branches:
+    - main
+    - release/*
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    steps:
+    - uses: actions/checkout@v2
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.9'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Build with PyInstaller
+      run: |
+        pip install pyinstaller
+        pyinstaller main.spec
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      with:
+        name: LLM-Coding-Toolset-${{ runner.os }}
+        path: dist/*
+
+  release:
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Download artifacts
+      uses: actions/download-artifact@v2
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: ${{ github.ref }}
+        release_name: Release ${{ github.ref }}
+        draft: false
+        prerelease: false
+    - name: Upload Release Assets
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: ./LLM-Coding-Toolset-${{ runner.os }}
+        asset_name: LLM-Coding-Toolset-${{ runner.os }}.zip
+        asset_content_type: application/zip
